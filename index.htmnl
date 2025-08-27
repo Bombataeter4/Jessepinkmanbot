@@ -1,0 +1,27 @@
+
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Streetwise Bot</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <h1>Jesse Pinkman Bot</h1>
+    <div id="chat" class="chat"></div>
+
+    <form id="form">
+      <input id="msg" type="text" placeholder="Typ je bericht..." autocomplete="off" required />
+      <label class="tiny">
+        <input type="checkbox" id="uncensor" />
+        ongecensureerde taal (optioneel)
+      </label>
+      <button type="submit">Stuur</button>
+    </form>
+    <p class="tiny">bruh.</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

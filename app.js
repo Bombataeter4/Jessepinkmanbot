@@ -1,5 +1,5 @@
 // Vervang dit zo met jouw Vercel-URL (stap 4):
-const PROXY_URL = "jessepinkmanbot-rj0doxzjb-atiebombaties-projects.vercel.app";
+const PROXY_URL = "jessepinkmanbot-b70oh7o58-atiebombaties-projects.vercel.app";
 
 const chatEl = document.getElementById("chat");
 const form = document.getElementById("form");

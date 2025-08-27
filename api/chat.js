@@ -1,62 +1,71 @@
 export default async function handler(req, res) {
-  const ALLOWED = process.env.ALLOWED_ORIGIN || "*";
-
-  // CORS preflight
-  if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Origin", ALLOWED);
+  const ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+  const send = (status, data) => {
+    res.status(status);
+    res.setHeader("Access-Control-Allow-Origin", ORIGIN);
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    return res.status(200).end();
+    return res.json(data);
+  };
+
+  if (req.method === "OPTIONS") return send(200, { ok: true });
+  if (req.method !== "POST") return send(405, { error: "Use POST /api/chat" });
+
+  if (!process.env.OPENAI_API_KEY) {
+    return send(500, { error: "Missing OPENAI_API_KEY (Vercel env var)." });
   }
 
-  if (req.method !== "POST") {
-    res.setHeader("Access-Control-Allow-Origin", ALLOWED);
-    return res.status(405).json({ error: "Use POST /api/chat" });
+  // --- Body veilig parsen (soms is req.body al object, soms string)
+  let body = req.body;
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch { return send(400, { error: "Invalid JSON body." }); }
   }
+  const { message, history = [] } = body || {};
+  if (!message || typeof message !== "string") {
+    return send(400, { error: "Missing 'message' (string) in body." });
+  }
+
+  const system = process.env.SYSTEM_PROMPT || "You are a helpful assistant.";
+  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+
+  const input = [
+    { role: "system", content: system },
+    ...(Array.isArray(history) ? history : []),
+    { role: "user", content: message }
+  ];
 
   try {
-    const { message, history = [] } = req.body || {};
-    if (!message) {
-      res.setHeader("Access-Control-Allow-Origin", ALLOWED);
-      return res.status(400).json({ error: "Missing 'message'" });
-    }
-
-    // Jij beheert je persona prompt via Vercel: Settings → Environment Variables → SYSTEM_PROMPT
-    const system = process.env.SYSTEM_PROMPT || "You are a helpful assistant.";
-
-    const input = [
-      { role: "system", content: system },
-      ...history,
-      { role: "user", content: message }
-    ];
-
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-        input
-      })
+      body: JSON.stringify({ model, input })
     });
 
+    const text = await r.text();
     if (!r.ok) {
-      const text = await r.text();
-      res.setHeader("Access-Control-Allow-Origin", ALLOWED);
-      return res.status(500).json({ error: text });
+      // Geef OpenAI-fout terug zodat jij ’m ziet in de browser
+      return send(502, { error: "OpenAI error", details: text });
     }
 
-    const json = await r.json();
+    let json;
+    try { json = JSON.parse(text); } catch { return send(500, { error: "Bad JSON from OpenAI", raw: text }); }
+
     const reply =
       json.output_text ??
       json.output?.[0]?.content?.[0]?.text ??
-      "(geen tekst)";
+      null;
 
-    res.setHeader("Access-Control-Allow-Origin", ALLOWED);
-    return res.status(200).json({ reply });
+    if (!reply) return send(500, { error: "No text in OpenAI response.", raw: json });
+
+    return send(200, { reply });
   } catch (e) {
+    return send(500, { error: "Server exception", details: String(e) });
+  }
+}
+
     res.setHeader("Access-Control-Allow-Origin", ALLOWED);
     return res.status(500).json({ error: e.message });
   }
